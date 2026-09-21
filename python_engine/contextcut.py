@@ -18,6 +18,50 @@ import os
 import sys
 
 class ContextPruner(ast.NodeTransformer):
+    def visit_FunctionDef(self, node):
+        pass
+    def visit_AsyncFunctionDef(self, node):
+        pass
+    def visit_ClassDef(self, node):
+        pass
+
+def prune_ast(file_path: str) -> str:
+    with open(file_path, "r", encoding="utf-8") as f:
+        original_source = f.read()
+
+    # Parse and transform the AST
+    tree = ast.parse(original_source)
+    transformer = ContextPruner()
+    transformed_tree = transformer.visit(tree)
+    ast.fix_missing_locations(transformed_tree)
+    
+    pruned_source = ast.unparse(transformed_tree)
+
+    # Calculate telemetry metrics
+    orig_chars = len(original_source)
+    pruned_chars = len(pruned_source)
+    saved_chars = orig_chars - pruned_chars
+    
+    # Rough token approximation (~4 chars per token)
+    orig_tokens_est = orig_chars // 4
+    pruned_tokens_est = pruned_chars // 4
+    saved_tokens_est = saved_chars // 4
+    pct_saved = (saved_chars / orig_chars * 100) if orig_chars > 0 else 0
+
+    telemetry_header = f'''"""
+[ContextCut Telemetry]
+----------------------------------------
+Original Size:  {orig_chars:,} chars (~{orig_tokens_est:,} tokens)
+Pruned Size:    {pruned_chars:,} chars (~{pruned_tokens_est:,} tokens)
+Token Savings:  {pct_saved:.1f}% reduction (~{saved_tokens_est:,} tokens saved)
+----------------------------------------
+"""
+
+'''
+    return telemetry_header + pruned_source
+
+
+class ContextPruner(ast.NodeTransformer):
     """
     Visits the Abstract Syntax Tree (AST) of a Python file and replaces 
     the bodies of all functions and methods with a 'pass' statement, 
