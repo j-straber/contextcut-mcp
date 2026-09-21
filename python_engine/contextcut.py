@@ -18,50 +18,6 @@ import os
 import sys
 
 class ContextPruner(ast.NodeTransformer):
-    def visit_FunctionDef(self, node):
-        pass
-    def visit_AsyncFunctionDef(self, node):
-        pass
-    def visit_ClassDef(self, node):
-        pass
-
-def prune_ast(file_path: str) -> str:
-    with open(file_path, "r", encoding="utf-8") as f:
-        original_source = f.read()
-
-    # Parse and transform the AST
-    tree = ast.parse(original_source)
-    transformer = ContextPruner()
-    transformed_tree = transformer.visit(tree)
-    ast.fix_missing_locations(transformed_tree)
-    
-    pruned_source = ast.unparse(transformed_tree)
-
-    # Calculate telemetry metrics
-    orig_chars = len(original_source)
-    pruned_chars = len(pruned_source)
-    saved_chars = orig_chars - pruned_chars
-    
-    # Rough token approximation (~4 chars per token)
-    orig_tokens_est = orig_chars // 4
-    pruned_tokens_est = pruned_chars // 4
-    saved_tokens_est = saved_chars // 4
-    pct_saved = (saved_chars / orig_chars * 100) if orig_chars > 0 else 0
-
-    telemetry_header = f'''"""
-[ContextCut Telemetry]
-----------------------------------------
-Original Size:  {orig_chars:,} chars (~{orig_tokens_est:,} tokens)
-Pruned Size:    {pruned_chars:,} chars (~{pruned_tokens_est:,} tokens)
-Token Savings:  {pct_saved:.1f}% reduction (~{saved_tokens_est:,} tokens saved)
-----------------------------------------
-"""
-
-'''
-    return telemetry_header + pruned_source
-
-
-class ContextPruner(ast.NodeTransformer):
     """
     Visits the Abstract Syntax Tree (AST) of a Python file and replaces 
     the bodies of all functions and methods with a 'pass' statement, 
@@ -72,21 +28,16 @@ class ContextPruner(ast.NodeTransformer):
         new_body = []
         
         if docstring:
-            # Reconstruct the docstring node
             new_body.append(ast.Expr(value=ast.Constant(value=docstring)))
             
         new_body.append(ast.Pass())
         node.body = new_body
-        
-        # Return the modified node without recursing into the now-deleted body
         return node
 
     def visit_AsyncFunctionDef(self, node):
-        # Apply the exact same logic to async functions
         return self.visit_FunctionDef(node)
         
     def visit_ClassDef(self, node):
-        # Recurse into classes so we can prune their internal methods
         self.generic_visit(node)
         return node
 
@@ -102,18 +53,28 @@ def prune_ast(file_path: str) -> str:
     pruned_tree = pruner.visit(tree)
     ast.fix_missing_locations(pruned_tree)
     
-    # ast.unparse requires Python 3.9+
     pruned_source = ast.unparse(pruned_tree)
     pruned_chars = len(pruned_source)
     
-    # Send telemetry to stderr so it doesn't pollute the MCP stdout payload
-    reduction_pct = (1 - (pruned_chars / original_chars)) * 100 if original_chars > 0 else 0
-    sys.stderr.write(
-        f"ContextCut Telemetry: Reduced from {original_chars} to {pruned_chars} "
-        f"characters ({reduction_pct:.1f}% reduction).\n"
-    )
-    
-    return pruned_source
+    # Calculate telemetry metrics
+    saved_chars = original_chars - pruned_chars
+    orig_tokens_est = original_chars // 4
+    pruned_tokens_est = pruned_chars // 4
+    saved_tokens_est = saved_chars // 4
+    pct_saved = (saved_chars / original_chars * 100) if original_chars > 0 else 0
+
+    # Inject a clean telemetry header comment into the code payload
+    telemetry_header = f'''"""
+[ContextCut Telemetry]
+----------------------------------------
+Original Size:  {original_chars:,} chars (~{orig_tokens_est:,} tokens)
+Pruned Size:    {pruned_chars:,} chars (~{pruned_tokens_est:,} tokens)
+Token Savings:  {pct_saved:.1f}% reduction (~{saved_tokens_est:,} tokens saved)
+----------------------------------------
+"""
+
+'''
+    return telemetry_header + pruned_source
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:
@@ -127,7 +88,6 @@ if __name__ == "__main__":
         sys.exit(1)
         
     try:
-        # Print the pruned code to stdout for the MCP server to capture
         result = prune_ast(target_path)
         print(result)
     except Exception as e:
