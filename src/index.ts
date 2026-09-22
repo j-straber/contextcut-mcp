@@ -27,6 +27,12 @@ import path from "path";
 import fs from "fs";
 import { pruneTypeScriptCode, pruneTypeScriptFile } from "./ts_pruner.js";
 import { getLicenseStatus, validateProAccess } from "./license.js";
+import {
+  recordPruneEvent,
+  generateSavingsReport,
+  formatSavingsReportMarkdown,
+  type SavingsInterval,
+} from "./telemetry.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -104,7 +110,7 @@ function formatTsTelemetry(origChars: number, prunedChars: number, filesCount = 
 const server = new Server(
   {
     name: "5tra83r-contextcut-mcp",
-    version: "1.2.0",
+    version: "1.3.0",
   },
   {
     capabilities: {
@@ -176,6 +182,28 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           },
         },
       },
+      {
+        name: "get_savings_report",
+        description:
+          "Generates an aggregated cost-benefit and token savings ROI report over a specified interval (daily, weekly, monthly, or all_time) based on persistent local history.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            interval: {
+              type: "string",
+              description:
+                "Reporting interval: 'daily' (past 24h), 'weekly' (past 7 days), 'monthly' (past 30 days), or 'all_time' (cumulative). Default: 'all_time'.",
+              enum: ["daily", "weekly", "monthly", "all_time"],
+            },
+            format: {
+              type: "string",
+              description:
+                "Output format: 'markdown' (default human-readable report) or 'json' (raw structured analytics).",
+              enum: ["markdown", "json"],
+            },
+          },
+        },
+      },
     ],
   };
 });
@@ -189,6 +217,33 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         {
           type: "text",
           text: JSON.stringify(status, null, 2),
+        },
+      ],
+    };
+  }
+
+  if (request.params.name === "get_savings_report") {
+    const args = request.params.arguments || {};
+    const interval = (args.interval as SavingsInterval) || "all_time";
+    const format = args.format === "json" ? "json" : "markdown";
+    const report = await generateSavingsReport(interval);
+
+    if (format === "json") {
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify(report, null, 2),
+          },
+        ],
+      };
+    }
+
+    return {
+      content: [
+        {
+          type: "text",
+          text: formatSavingsReportMarkdown(report),
         },
       ],
     };
@@ -235,12 +290,11 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       // Pro access validated: execute TypeScript AST pruner
+      let tsRes: { pruned: string; origChars: number; prunedChars: number } | null = null;
+      let filesCount = 1;
+
       if (codeContent) {
-        const res = pruneTypeScriptCode(codeContent);
-        const header = formatTsTelemetry(res.origChars, res.prunedChars);
-        return {
-          content: [{ type: "text", text: header + res.pruned }],
-        };
+        tsRes = pruneTypeScriptCode(codeContent);
       } else if (targetPath) {
         if (!fs.existsSync(targetPath)) {
           return {
@@ -250,17 +304,45 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         }
         const stat = fs.statSync(targetPath);
         if (stat.isFile()) {
-          const res = await pruneTypeScriptFile(targetPath);
-          const header = formatTsTelemetry(res.origChars, res.prunedChars);
-          return {
-            content: [{ type: "text", text: header + res.pruned }],
-          };
+          tsRes = await pruneTypeScriptFile(targetPath);
         }
+      }
+
+      if (tsRes) {
+        const header = formatTsTelemetry(tsRes.origChars, tsRes.prunedChars, filesCount);
+        const origTokens = Math.max(1, Math.floor(tsRes.origChars / 4));
+        const prunedTokens = Math.max(1, Math.floor(tsRes.prunedChars / 4));
+        const savedTokens = Math.max(0, origTokens - prunedTokens);
+        const savedUsd = (savedTokens / 1_000_000) * 3.0;
+        const detectedLang =
+          targetPath &&
+          (targetPath.endsWith(".js") ||
+            targetPath.endsWith(".jsx") ||
+            targetPath.endsWith(".mjs") ||
+            targetPath.endsWith(".cjs"))
+            ? "javascript"
+            : "typescript";
+
+        await recordPruneEvent({
+          lang: language || detectedLang,
+          target: targetPath || "<raw_code>",
+          files: filesCount,
+          origChars: tsRes.origChars,
+          prunedChars: tsRes.prunedChars,
+          origTokens,
+          prunedTokens,
+          savedTokens,
+          savedUsd,
+        });
+
+        return {
+          content: [{ type: "text", text: header + tsRes.pruned }],
+        };
       }
     }
 
     // 2. Python AST pruning (100% Free Core Engine)
-    const cliArgs: string[] = [];
+    const cliArgs: string[] = ["--no-history", "--json"];
     if (targetPath) {
       cliArgs.push(targetPath);
     }
@@ -275,11 +357,33 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     }
 
     const result = await executePythonContextCut(cliArgs);
+    let outputText = result;
+
+    try {
+      const parsed = JSON.parse(result);
+      if (parsed && typeof parsed === "object" && typeof parsed.output === "string") {
+        outputText = parsed.output;
+        await recordPruneEvent({
+          lang: "python",
+          target: targetPath || "<raw_code>",
+          files: parsed.files_count || 1,
+          origChars: parsed.orig_chars || 0,
+          prunedChars: parsed.pruned_chars || 0,
+          origTokens: parsed.orig_tokens || 0,
+          prunedTokens: parsed.pruned_tokens || 0,
+          savedTokens: parsed.saved_tokens || 0,
+          savedUsd: parsed.cost_saved_usd || 0,
+        });
+      }
+    } catch {
+      // Fallback if result was plain text
+    }
+
     return {
       content: [
         {
           type: "text",
-          text: result,
+          text: outputText,
         },
       ],
     };
@@ -407,12 +511,33 @@ server.setRequestHandler(GetPromptRequestSchema, async (request) => {
 });
 
 // -----------------------------------------------------------------------------
-// 4. Server Transport Startup
+// 4. Server Transport Startup / CLI Report Invocation
 // -----------------------------------------------------------------------------
 async function run() {
+  // Check for CLI report / stats invocation (e.g. npx contextcut-mcp stats --interval=weekly)
+  const isReportArg = process.argv.some(
+    (a) => a === "report" || a === "stats" || a === "--report" || a === "--stats"
+  );
+
+  if (isReportArg) {
+    const rawInterval = process.argv.find((a) => a.startsWith("--interval="))?.split("=")[1];
+    const interval = (["daily", "weekly", "monthly", "all_time"].includes(rawInterval || "")
+      ? rawInterval
+      : "all_time") as SavingsInterval;
+    const formatJson = process.argv.includes("--json");
+    const report = await generateSavingsReport(interval);
+
+    if (formatJson) {
+      console.log(JSON.stringify(report, null, 2));
+    } else {
+      console.log(formatSavingsReportMarkdown(report));
+    }
+    process.exit(0);
+  }
+
   const transport = new StdioServerTransport();
   await server.connect(transport);
-  console.error("ContextCut Polyglot MCP Server v1.2.0 is running on stdio");
+  console.error("ContextCut Polyglot MCP Server v1.3.0 is running on stdio");
 }
 
 run().catch((err) => {

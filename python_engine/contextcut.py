@@ -22,6 +22,7 @@ import json
 import os
 import sys
 from typing import List, Tuple, Optional, Dict, Any
+from datetime import datetime, timezone
 
 # Cost reference: $3.00 per 1M input tokens (Frontier standard: Claude 3.5 Sonnet / GPT-4o)
 COST_PER_MILLION_TOKENS = 3.00
@@ -228,6 +229,41 @@ def prune_target(
     }
 
 
+def record_telemetry_event(result: Dict[str, Any], target_label: Optional[str] = None) -> None:
+    """Appends a prune run event to ~/.contextcut/history.jsonl (failsafe)."""
+    try:
+        hist_env = os.environ.get("CONTEXTCUT_HISTORY_FILE")
+        if hist_env:
+            history_path = hist_env
+        else:
+            history_path = os.path.join(os.path.expanduser("~"), ".contextcut", "history.jsonl")
+
+        os.makedirs(os.path.dirname(history_path), exist_ok=True)
+
+        sanitized_target = None
+        if target_label:
+            parts = os.path.normpath(target_label).split(os.sep)
+            sanitized_target = "/".join(parts[-3:])
+
+        record = {
+            "ts": datetime.now(timezone.utc).isoformat(),
+            "lang": "python",
+            "target": sanitized_target,
+            "files": result.get("files_count", 1),
+            "origChars": result.get("orig_chars", 0),
+            "prunedChars": result.get("pruned_chars", 0),
+            "origTokens": result.get("orig_tokens", 0),
+            "prunedTokens": result.get("pruned_tokens", 0),
+            "savedTokens": result.get("saved_tokens", 0),
+            "savedUsd": round(result.get("cost_saved_usd", 0.0), 6),
+        }
+
+        with open(history_path, "a", encoding="utf-8") as f:
+            f.write(json.dumps(record) + "\n")
+    except Exception:
+        pass
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="ContextCut - AST-Based Context Pruner for LLMs"
@@ -243,6 +279,7 @@ def main():
     )
     parser.add_argument("--no-telemetry", action="store_true", help="Omit the telemetry header")
     parser.add_argument("--json", action="store_true", help="Output JSON metadata along with code")
+    parser.add_argument("--no-history", action="store_true", help="Do not record this run in ~/.contextcut/history.jsonl")
 
     args = parser.parse_args()
 
@@ -263,6 +300,9 @@ def main():
             depth=args.depth,
             include_telemetry=not args.no_telemetry,
         )
+
+        if not args.no_history:
+            record_telemetry_event(result, target_label=args.target or "<raw_code>")
 
         if args.json:
             print(json.dumps(result, indent=2))

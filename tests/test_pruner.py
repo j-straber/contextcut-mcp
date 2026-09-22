@@ -19,6 +19,7 @@ from contextcut import (
     prune_target,
     estimate_tokens,
     calculate_cost_savings,
+    record_telemetry_event,
 )
 
 
@@ -131,6 +132,36 @@ def big_workload():
             self.assertNotIn("ignore.txt", combined)
             self.assertIn("def func_a():", combined)
             self.assertIn("def func_b():", combined)
+
+    def test_record_telemetry_event(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            test_history_file = os.path.join(tmpdir, "history.jsonl")
+            orig_env = os.environ.get("CONTEXTCUT_HISTORY_FILE")
+            os.environ["CONTEXTCUT_HISTORY_FILE"] = test_history_file
+
+            try:
+                res = {
+                    "files_count": 1,
+                    "orig_chars": 1000,
+                    "pruned_chars": 250,
+                    "orig_tokens": 250,
+                    "pruned_tokens": 62,
+                    "saved_tokens": 188,
+                    "cost_saved_usd": 0.000564,
+                }
+                record_telemetry_event(res, target_label="src/my_module.py")
+
+                self.assertTrue(os.path.exists(test_history_file))
+                with open(test_history_file, "r") as f:
+                    content = f.read()
+                self.assertIn("src/my_module.py", content)
+                self.assertIn('"savedTokens": 188', content)
+                self.assertIn('"lang": "python"', content)
+            finally:
+                if orig_env is not None:
+                    os.environ["CONTEXTCUT_HISTORY_FILE"] = orig_env
+                else:
+                    os.environ.pop("CONTEXTCUT_HISTORY_FILE", None)
 
 
 if __name__ == "__main__":
