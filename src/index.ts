@@ -83,9 +83,20 @@ async function executePythonContextCut(args: string[]): Promise<string> {
 
 function isTypeScriptOrJavaScript(filePath?: string, languageHint?: string): boolean {
   if (languageHint === "typescript" || languageHint === "javascript") return true;
+  if (languageHint === "python") return false;
   if (!filePath) return false;
   const ext = path.extname(filePath).toLowerCase();
-  return [".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs"].includes(ext);
+  if ([".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs"].includes(ext)) return true;
+  try {
+    if (fs.existsSync(filePath) && fs.statSync(filePath).isDirectory()) {
+      if (fs.existsSync(path.join(filePath, "tsconfig.json"))) return true;
+      const entries = fs.readdirSync(filePath);
+      return entries.some((e) =>
+        [".ts", ".tsx", ".js", ".jsx"].includes(path.extname(e).toLowerCase())
+      );
+    }
+  } catch {}
+  return false;
 }
 
 function formatTsTelemetry(origChars: number, prunedChars: number, filesCount = 1): string {
@@ -306,6 +317,51 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         const stat = fs.statSync(targetPath);
         if (stat.isFile()) {
           tsRes = await pruneTypeScriptFile(targetPath);
+        } else if (stat.isDirectory()) {
+          const matchedFiles: string[] = [];
+          const scanDir = (dir: string) => {
+            const entries = fs.readdirSync(dir, { withFileTypes: true });
+            for (const entry of entries) {
+              if (
+                entry.name.startsWith(".") ||
+                entry.name === "node_modules" ||
+                entry.name === "build" ||
+                entry.name === "dist" ||
+                entry.name === "__pycache__"
+              ) {
+                continue;
+              }
+              const full = path.join(dir, entry.name);
+              if (entry.isDirectory()) {
+                scanDir(full);
+              } else if (entry.isFile()) {
+                const ext = path.extname(entry.name).toLowerCase();
+                if ([".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs"].includes(ext) && !entry.name.endsWith(".d.ts")) {
+                  matchedFiles.push(full);
+                }
+              }
+            }
+          };
+          scanDir(targetPath);
+
+          if (matchedFiles.length > 0) {
+            filesCount = matchedFiles.length;
+            let totalOrig = 0;
+            let totalPruned = 0;
+            const outputParts: string[] = [];
+            for (const file of matchedFiles) {
+              const rel = path.relative(targetPath, file);
+              const singleRes = await pruneTypeScriptFile(file);
+              totalOrig += singleRes.origChars;
+              totalPruned += singleRes.prunedChars;
+              outputParts.push(`// ========================================\n// File: ${rel}\n// ========================================\n${singleRes.pruned}\n`);
+            }
+            tsRes = {
+              pruned: outputParts.join("\n"),
+              origChars: totalOrig,
+              prunedChars: totalPruned,
+            };
+          }
         }
       }
 
