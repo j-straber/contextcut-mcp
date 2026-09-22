@@ -666,20 +666,37 @@ async function run() {
   if (isDashboardArg) {
     const { readHistoryRecords } = await import("./telemetry.js");
     const { getDashboardHtml } = await import("./dashboard_html.js");
-    const { records } = await readHistoryRecords("all_time");
-
-    const html = getDashboardHtml(JSON.stringify(records));
     const port = 3800;
 
-    const localServer = http.createServer((_req, res) => {
-      res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
-      res.end(html);
+    const localServer = http.createServer(async (req, res) => {
+      const parsedUrl = new URL(req.url || "/", `http://localhost:${port}`);
+
+      if (parsedUrl.pathname === "/api/history") {
+        const { records: freshRecords } = await readHistoryRecords("all_time");
+        res.writeHead(200, {
+          "Content-Type": "application/json",
+          "Cache-Control": "no-store, no-cache, must-revalidate",
+        });
+        res.end(JSON.stringify({ records: freshRecords }));
+        return;
+      }
+
+      // Serve fresh HTML on every page load/refresh
+      const { records: freshRecords } = await readHistoryRecords("all_time");
+      const freshHtml = getDashboardHtml(JSON.stringify(freshRecords));
+      res.writeHead(200, {
+        "Content-Type": "text/html; charset=utf-8",
+        "Cache-Control": "no-store, no-cache, must-revalidate",
+      });
+      res.end(freshHtml);
     });
 
-    localServer.listen(port, () => {
+    localServer.listen(port, async () => {
+      const { records: initialRecords } = await readHistoryRecords("all_time");
       const url = `http://localhost:${port}`;
       console.log(`\n⚡ [ContextCut Executive Dashboard]`);
-      console.log(`✓ Serving visual analytics from ~/.contextcut/history.jsonl (${records.length} events)`);
+      console.log(`✓ Serving visual analytics from ~/.contextcut/history.jsonl (${initialRecords.length} events)`);
+      console.log(`✓ Live dynamic reloading & auto-sync enabled`);
       console.log(`✓ Opening browser at: ${url}`);
       console.log(`\nPress Ctrl+C to stop the dashboard server.\n`);
 

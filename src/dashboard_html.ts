@@ -618,6 +618,22 @@ export function getDashboardHtml(preloadedRecordsJson: string): string {
     }
 
     renderDashboard();
+
+    // Auto-poll /api/history when served by local CLI dashboard server
+    if (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") {
+      setInterval(async () => {
+        try {
+          const res = await fetch("/api/history", { cache: "no-store" });
+          if (res.ok) {
+            const data = await res.json();
+            if (Array.isArray(data.records) && data.records.length !== allRecords.length) {
+              allRecords = data.records;
+              renderDashboard();
+            }
+          }
+        } catch {}
+      }, 3000);
+    }
   </script>
 </body>
 </html>`;
