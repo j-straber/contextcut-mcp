@@ -1,5 +1,6 @@
-# ContextCut MCP Server (v1.1.0)
+# ContextCut MCP Server (v1.2.0 - Polyglot)
 
+[![Website](https://img.shields.io/badge/Website-5tra83rStudios.com-purple.svg)](https://5tra83rstudios.com)
 [![License: ISC](https://img.shields.io/badge/License-ISC-blue.svg)](LICENSE)
 [![MCP](https://img.shields.io/badge/MCP-Compliant-brightgreen.svg)](https://modelcontextprotocol.io)
 [![Python](https://img.shields.io/badge/Python-3.9+-blue.svg)](https://python.org)
@@ -7,7 +8,15 @@
 
 **ContextCut** is a local-first, AST-based code context pruner for LLMs and AI coding agents (Claude Desktop, Cursor, Antigravity, Roo Code) via the **Model Context Protocol (MCP)**.
 
-It parses Python files and directories, stripping out internal function and method bodies down to `pass` while retaining 100% of signatures, type hints, dataclasses, and docstrings.
+It parses Python and TypeScript files and directories, stripping out internal function and method bodies down to stubs while retaining 100% of signatures, interfaces, type hints, dataclasses, and docstrings.
+
+---
+
+## 📸 Verified Live in Claude Desktop
+
+| TypeScript AST Pruning (48.1% Token Reduction) | Python Architecture Analysis (55.2% Token Reduction) |
+| :---: | :---: |
+| <img src="assets/demo_typescript.png" width="450" alt="Claude Pruning TypeScript" /> | <img src="assets/demo_python.png" width="450" alt="Claude Pruning Python" /> |
 
 ---
 
