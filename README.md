@@ -1,26 +1,125 @@
-# ContextCut MCP Server (Beta)
+# ContextCut MCP Server (v1.1.0)
 
-An AST-based context pruner for LLMs. This local MCP server intercepts Python files and strips out function bodies, returning only signatures, types, and docstrings to the LLM to drastically reduce token bloat.
+[![License: ISC](https://img.shields.io/badge/License-ISC-blue.svg)](LICENSE)
+[![MCP](https://img.shields.io/badge/MCP-Compliant-brightgreen.svg)](https://modelcontextprotocol.io)
+[![Python](https://img.shields.io/badge/Python-3.9+-blue.svg)](https://python.org)
+[![Node](https://img.shields.io/badge/Node-18+-green.svg)](https://nodejs.org)
 
-## Setup Instructions
+**ContextCut** is a local-first, AST-based code context pruner for LLMs and AI coding agents (Claude Desktop, Cursor, Antigravity, Roo Code) via the **Model Context Protocol (MCP)**.
 
-1. Install Dependencies:
-   npm install
+It parses Python files and directories, stripping out internal function and method bodies down to `pass` while retaining 100% of signatures, type hints, dataclasses, and docstrings.
 
-2. Build the Python Engine:
-   Ensure you have PyInstaller installed (pip install pyinstaller), then compile:
-   pyinstaller --onefile --distpath ./bin --name contextcut python_engine/contextcut.py
+---
 
-3. Build the TypeScript Server:
-   npx tsc
+## ⚡ What it Does
 
-4. Connect to Claude Desktop:
-   Add this to your claude_desktop_config.json:
-   {
-     "mcpServers": {
-       "contextcut": {
-         "command": "node",
-         "args": ["/Users/straber/Projects/contextcut-mcp/build/index.js"]
-       }
-     }
-   }
+```python
+# Before ContextCut (~350 tokens of internal loops, regex, and logging):
+def process_data(uri: str) -> dict:
+    """Loads and normalizes schema."""
+    if not uri:
+        raise ValueError("Invalid")
+    # ... 40 lines of heavy implementation logic ...
+    return result
+
+# After ContextCut (~35 tokens, 90% reduction):
+def process_data(uri: str) -> dict:
+    """Loads and normalizes schema."""
+    pass
+```
+
+### Real-Time Telemetry Header
+Every pruned output automatically injects an instant token and cost savings summary:
+
+```python
+"""
+[ContextCut Telemetry]
+----------------------------------------
+Files Pruned:   3
+Original Size:  14,250 chars (~3,562 tokens)
+Pruned Size:    3,810 chars (~952 tokens)
+Token Savings:  73.3% reduction (~2,610 tokens saved)
+Est. Cost Saved: $0.0078 per prompt (@ $3.00/1M tokens)
+----------------------------------------
+"""
+```
+
+---
+
+## 🚀 Quick Start
+
+### 1. Install & Build
+```bash
+git clone https://github.com/5tra83r/contextcut-mcp.git
+cd contextcut-mcp
+npm install
+npm run build
+```
+
+> **Zero-Friction Runtime**: ContextCut automatically detects your environment. If a compiled binary in `./bin/contextcut` is present, it uses it; otherwise, it seamlessly falls back to your local `python3` installation.
+
+### 2. Connect to MCP Clients
+
+#### Claude Desktop
+Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
+```json
+{
+  "mcpServers": {
+    "contextcut": {
+      "command": "node",
+      "args": ["/ABSOLUTE/PATH/TO/contextcut-mcp/build/index.js"]
+    }
+  }
+}
+```
+
+#### Antigravity / Cursor
+Configure in your project's `.agents/` or MCP settings:
+```json
+{
+  "mcpServers": {
+    "contextcut": {
+      "command": "node",
+      "args": ["/ABSOLUTE/PATH/TO/contextcut-mcp/build/index.js"]
+    }
+  }
+}
+```
+
+---
+
+## 🛠 Available Tools, Prompts & Resources
+
+### Tool: `prune_code_context`
+* `target_path`: Path to a single Python file or directory.
+* `glob_pattern`: Optional filter for directory scans (default: `*.py`).
+* `depth`:
+  * `"interfaces_only"` (default): Preserves docstrings, signatures, and types.
+  * `"minimal"`: Strips docstrings for maximum token compression.
+* `code_content`: Optional raw Python code string to prune directly in-memory.
+
+### Prompt: `analyze_architecture`
+Guides your AI agent to inspect a repository's high-level architecture using pruned interface stubs without getting lost in implementation noise.
+
+### Resource: `contextcut://pruned/{filepath}`
+Exposes on-demand pruned stubs as native MCP readable resources.
+
+---
+
+## 🧪 Testing
+
+Run the automated test suite:
+```bash
+npm test
+# Or: python3 -m unittest discover -s tests
+```
+
+---
+
+## 💼 Business & Monetization
+See [MONETIZATION.md](MONETIZATION.md) for the complete Go-To-Market roadmap, Lemon Squeezy payment integration, and community registry launch guide.
+
+---
+
+## 📄 License
+© 2026 5tra83r Studios. All rights reserved.

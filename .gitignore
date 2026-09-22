@@ -2,4 +2,8 @@ node_modules/
 build/
 bin/
 __pycache__/
+*.pyc
 .DS_Store
+*.log
+.env
+.venv/

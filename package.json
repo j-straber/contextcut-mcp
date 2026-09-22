@@ -1,16 +1,33 @@
 {
   "name": "contextcut-mcp",
-  "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "version": "1.2.0",
+  "description": "AST-based context pruner for LLMs and AI coding agents via the Model Context Protocol (MCP)",
+  "main": "build/index.js",
   "type": "module",
+  "bin": {
+    "contextcut-mcp": "./build/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc --watch",
+    "start": "node build/index.js",
+    "test": "python3 -m unittest discover -s tests"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "ast",
+    "token-optimizer",
+    "context-window",
+    "claude",
+    "cursor",
+    "gemini",
+    "agentic-ai"
+  ],
+  "author": "5tra83r Studios",
+  "license": "ISC",
   "dependencies": {
+    "@babel/parser": "^7.29.9",
     "@modelcontextprotocol/sdk": "^1.30.0"
   },
   "devDependencies": {
