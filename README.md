@@ -96,43 +96,26 @@ npx contextcut-mcp dashboard
 
 ## 🚀 Quick Start
 
-### 1. Install & Build
+### ⚡ 1. 1-Click Automated Machine Setup (Zero JSON Editing)
+Connect ContextCut to all your installed AI desktop apps in 2 seconds:
+
 ```bash
-git clone https://github.com/5tra83r/contextcut-mcp.git
-cd contextcut-mcp
-npm install
-npm run build
+# Automatically finds Claude Desktop, Cursor, Antigravity, and Windsurf:
+npx contextcut-mcp install
 ```
 
-> **Zero-Friction Runtime**: ContextCut automatically detects your environment. If a compiled binary in `./bin/contextcut` is present, it uses it; otherwise, it seamlessly falls back to your local `python3` installation.
+### ✂️ 2. Clipboard Quick-Trimmer (For Web ChatGPT & Gemini)
+Using ChatGPT or Gemini in your web browser? Prevent the dreaded **5-hour usage limit lockout**:
 
-### 2. Connect to MCP Clients
-
-#### Claude Desktop
-Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
-```json
-{
-  "mcpServers": {
-    "contextcut": {
-      "command": "node",
-      "args": ["/ABSOLUTE/PATH/TO/contextcut-mcp/build/index.js"]
-    }
-  }
-}
+```bash
+# 1. Copy bloated code or functions to clipboard (Cmd+C)
+# 2. Run the quick-trimmer:
+npx contextcut-mcp clip
+# 3. Paste trimmed interfaces directly into ChatGPT / Gemini (Cmd+V)!
 ```
+> Or trim code 100% online directly in your browser: 👉 **[5tra83rstudios.com/viewer/#trimmer](https://5tra83rstudios.com/viewer/#trimmer)**
 
-#### Antigravity / Cursor
-Configure in your project's `.agents/` or MCP settings:
-```json
-{
-  "mcpServers": {
-    "contextcut": {
-      "command": "node",
-      "args": ["/ABSOLUTE/PATH/TO/contextcut-mcp/build/index.js"]
-    }
-  }
-}
-```
+---
 
 ### 3. Enable Agent Autopilot Mode (Recommended)
 Never forget to use ContextCut again. Run this 1-click command inside any project directory:

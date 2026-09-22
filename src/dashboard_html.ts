@@ -327,6 +327,74 @@ export function getDashboardHtml(preloadedRecordsJson: string): string {
       color: #38bdf8;
     }
 
+    /* Web Trimmer Card */
+    .trimmer-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-lg);
+      padding: 24px;
+      margin-bottom: 28px;
+    }
+
+    .trimmer-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+
+    .trimmer-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+
+    @media (max-width: 768px) {
+      .trimmer-grid { grid-template-columns: 1fr; }
+    }
+
+    .trimmer-col label {
+      display: block;
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--text-secondary);
+      margin-bottom: 8px;
+    }
+
+    .trimmer-col textarea {
+      width: 100%;
+      height: 220px;
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-md);
+      padding: 14px;
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+      color: var(--text-primary);
+      resize: vertical;
+      line-height: 1.5;
+    }
+
+    .trimmer-col textarea:focus {
+      outline: none;
+      border-color: var(--accent-indigo);
+      box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2);
+    }
+
+    .trimmer-stat {
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      margin-top: 6px;
+    }
+
+    .trimmer-stat.green {
+      color: #34d399;
+      font-weight: 600;
+    }
+
     .exec-footer {
       border-top: 1px solid var(--border-color);
       padding: 30px 0 60px;
@@ -458,6 +526,43 @@ export function getDashboardHtml(preloadedRecordsJson: string): string {
           <tr><td colspan="4" style="text-align: center; color: var(--text-muted);">No records found for this period.</td></tr>
         </tbody>
       </table>
+    </div>
+
+    <!-- ✂️ Quick Web Context Trimmer (For ChatGPT, Gemini & Claude Web) -->
+    <div class="trimmer-card" id="trimmer">
+      <div class="trimmer-header">
+        <div>
+          <h3>✂️ Quick Web Context Trimmer</h3>
+          <p style="color: var(--text-secondary); font-size: 0.85rem; margin-top: 4px;">
+            Paste bloated code or functions here to strip internal bodies before prompting ChatGPT, Gemini, or Claude. <strong>Prevent the 5-hour workday lockout!</strong>
+          </p>
+        </div>
+        <div style="display: flex; gap: 8px; align-items: center;">
+          <select id="trimmerLang" style="background: var(--bg-secondary); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 6px; padding: 6px 12px; font-size: 0.85rem;">
+            <option value="auto">Auto-Detect</option>
+            <option value="python">Python</option>
+            <option value="typescript">TypeScript / JS</option>
+          </select>
+          <button class="btn btn-primary" onclick="runWebTrimmer()" style="padding: 6px 16px; font-size: 0.85rem;">⚡ Trim Context</button>
+        </div>
+      </div>
+
+      <div class="trimmer-grid">
+        <div class="trimmer-col">
+          <label>Original Code / Context (Paste here)</label>
+          <textarea id="rawInput" placeholder="Paste python or typescript functions, classes, or module definitions here..."></textarea>
+          <div class="trimmer-stat" id="rawTokenCount">Tokens: ~0</div>
+        </div>
+
+        <div class="trimmer-col">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+            <label style="margin: 0;">Trimmed Output (Ready to paste)</label>
+            <button class="btn btn-secondary" onclick="copyTrimmedOutput()" style="padding: 2px 10px; font-size: 0.75rem;">📋 Copy Trimmed</button>
+          </div>
+          <textarea id="trimmedOutput" readonly placeholder="Trimmed interfaces and signatures will appear here..."></textarea>
+          <div class="trimmer-stat green" id="trimmedTokenCount">Tokens: ~0 (0% saved)</div>
+        </div>
+      </div>
     </div>
 
     <div class="exec-footer">
@@ -614,6 +719,80 @@ export function getDashboardHtml(preloadedRecordsJson: string): string {
             legend: { position: "bottom", labels: { color: "#cbd5e1", boxWidth: 12 } }
           }
         }
+      });
+    }
+
+    // In-Browser Context Trimmer
+    function runWebTrimmer() {
+      const raw = document.getElementById("rawInput").value;
+      if (!raw.trim()) {
+        alert("Please paste some code into the input box first!");
+        return;
+      }
+
+      const langSelect = document.getElementById("trimmerLang").value;
+      const isPython = langSelect === "python" || (langSelect === "auto" && (raw.includes("def ") || raw.includes("class ")) && (raw.includes("import ") || raw.includes("self.") || raw.includes(":\n")));
+
+      let trimmed = raw;
+      if (isPython) {
+        const lines = raw.split("\n");
+        const outLines = [];
+        let inFunc = false;
+        let funcIndent = 0;
+
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i];
+          const match = line.match(/^(\s*)def\s+[\w_]+\s*\(.*?\)(\s*->\s*[^:]+)?\s*:/);
+          if (match) {
+            outLines.push(line);
+            funcIndent = match[1].length;
+            inFunc = true;
+            if (i + 1 < lines.length && lines[i + 1].trim().startsWith('"""')) {
+              let doc = lines[++i];
+              outLines.push(doc);
+              if (!doc.trim().endsWith('"""') || doc.trim() === '"""') {
+                while (++i < lines.length) {
+                  outLines.push(lines[i]);
+                  if (lines[i].includes('"""')) break;
+                }
+              }
+            }
+            outLines.push(" ".repeat(funcIndent + 4) + "pass");
+          } else if (inFunc) {
+            const currentIndent = line.search(/\S/);
+            if (currentIndent !== -1 && currentIndent <= funcIndent && !line.trim().startsWith("#")) {
+              inFunc = false;
+              outLines.push(line);
+            }
+          } else {
+            outLines.push(line);
+          }
+        }
+        trimmed = outLines.join("\n");
+      } else {
+        trimmed = raw.replace(/(function\s*[\w_]*\s*\([^)]*\)\s*(?::\s*[^{\n]+)?)\s*\{[\s\S]*?\n\s*\}/g, "$1 { /* stub */ }")
+                     .replace(/((?:async\s+)?[\w_]+\s*\([^)]*\)\s*(?::\s*[^{\n]+)?)\s*\{[\s\S]*?\n\s*\}/g, "$1 { /* stub */ }");
+      }
+
+      document.getElementById("trimmedOutput").value = trimmed;
+
+      const origTokens = Math.max(1, Math.floor(raw.length / 4));
+      const prunedTokens = Math.max(1, Math.floor(trimmed.length / 4));
+      const savedTokens = Math.max(0, origTokens - prunedTokens);
+      const reduction = origTokens > 0 ? ((savedTokens / origTokens) * 100).toFixed(1) : "0.0";
+
+      document.getElementById("rawTokenCount").innerText = \`Tokens: ~\${origTokens.toLocaleString()} (\${raw.length.toLocaleString()} chars)\`;
+      document.getElementById("trimmedTokenCount").innerText = \`Tokens: ~\${prunedTokens.toLocaleString()} (\${reduction}% saved — ~\${savedTokens.toLocaleString()} tokens saved)\`;
+    }
+
+    function copyTrimmedOutput() {
+      const out = document.getElementById("trimmedOutput").value;
+      if (!out.trim()) {
+        alert("Nothing to copy! Click 'Trim Context' first.");
+        return;
+      }
+      navigator.clipboard.writeText(out).then(() => {
+        alert("✓ Trimmed context copied to clipboard! Paste directly into ChatGPT, Gemini, or Claude.");
       });
     }
 

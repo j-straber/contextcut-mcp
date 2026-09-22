@@ -658,6 +658,28 @@ async function run() {
     process.exit(0);
   }
 
+  // Check for 1-Click Installer invocation (e.g. npx contextcut-mcp install)
+  const isInstallArg = process.argv.some(
+    (a) => a === "install" || a === "setup" || a === "--install" || a === "--setup"
+  );
+
+  if (isInstallArg) {
+    const { runInstallerCli } = await import("./installer.js");
+    await runInstallerCli(process.argv.slice(2));
+    process.exit(0);
+  }
+
+  // Check for Clipboard Trimmer invocation (e.g. npx contextcut-mcp clip)
+  const isClipArg = process.argv.some(
+    (a) => a === "clip" || a === "trim" || a === "--clip" || a === "--trim"
+  );
+
+  if (isClipArg) {
+    const { runClipboardCli } = await import("./clipboard.js");
+    await runClipboardCli();
+    process.exit(0);
+  }
+
   // Check for CLI dashboard invocation (e.g. npx contextcut-mcp dashboard)
   const isDashboardArg = process.argv.some(
     (a) => a === "dashboard" || a === "ui" || a === "viewer" || a === "--dashboard"
