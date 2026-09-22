@@ -77,6 +77,10 @@ node build/index.js report --interval=monthly --json
 ### 📈 Visual Interactive Dashboard (Web UI & CLI):
 Launch an interactive visual dashboard in your browser to visualize savings over time, track top pruned files, and export executive PDF reports:
 
+<p align="center">
+  <img src="assets/dashboard_preview.png" width="780" alt="ContextCut Executive ROI & Token Dashboard" />
+</p>
+
 ```bash
 # Launch offline visual dashboard in your default browser:
 node build/index.js dashboard
@@ -84,9 +88,9 @@ node build/index.js dashboard
 npx contextcut-mcp dashboard
 ```
 
-Or access the cloudless drag-and-drop web viewer directly on our site:
-👉 **[5tra83rstudios.com/viewer](https://5tra83rstudios.com/viewer/)** (100% private, client-side only; zero telemetry leaves your browser).
-
+* **Live Dynamic Sync**: Automatically refreshes live as your AI coding agents prune files in real-time.
+* **Executive PDF Export**: One-click print-ready formatted report for leadership and CFO reviews.
+* **100% Client-Side Web Viewer**: Drag-and-drop your `~/.contextcut/history.jsonl` anytime at 👉 **[5tra83rstudios.com/viewer](https://5tra83rstudios.com/viewer/)** (zero telemetry leaves your machine).
 
 ---
 

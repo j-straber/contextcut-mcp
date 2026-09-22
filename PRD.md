@@ -60,17 +60,25 @@ Provide a lightweight, local CLI/middleware engine that parses Abstract Syntax T
 
 ## 6. Release Phases & Roadmap
 
-### Phase 1: MVP (Current)
-- Core CLI tool release.
-- Support for Python AST pruning (multi-file, directory, depth controls).
-- Real-time CLI telemetry with token and dollar savings.
+### Phase 1: MVP (Completed - v1.0.0)
+- [x] Core CLI tool release.
+- [x] Support for Python AST pruning (multi-file, directory, depth controls).
+- [x] Real-time CLI telemetry with token and dollar savings.
 
-### Phase 2: Integration & Multi-Language
-- Native MCP Server support with auto-fallback execution.
-- Language expansion: Support for TypeScript/JavaScript, Go, and Rust.
-- Smart "Deep-Dive" mode: Automatically include function bodies for symbols directly mentioned in the user's prompt.
+### Phase 2: Integration & Multi-Language (Completed - v1.2.0)
+- [x] Native MCP Server support with stdio transport and auto-fallback execution.
+- [x] Language expansion: Support for TypeScript/JavaScript AST pruning (@babel/parser).
+- [x] Paywall license gating for Pro Polyglot capabilities.
 
-### Phase 3: Enterprise & Monetization
-- Enterprise team dashboard with aggregated API cost savings analytics.
-- Shared team rulesets for context exclusion (e.g., always prune `tests/` or `dist/`).
-- Custom AST configuration filters for proprietary internal frameworks.
+### Phase 3: Persistent ROI Ledger & Visual Dashboard (Completed - v1.3.0)
+- [x] Persistent local-first append-only ledger (`~/.contextcut/history.jsonl`).
+- [x] Terminal interval reporting (`node build/index.js report --interval=weekly`).
+- [x] 1-Click Autopilot Mode (`npx contextcut-mcp init`) for Cursor and Claude Desktop.
+- [x] Interactive Executive ROI Dashboard CLI server (`npx contextcut-mcp dashboard`) with live auto-sync.
+- [x] Client-side privacy-first Web Viewer (`5tra83rstudios.com/viewer`) with drag-and-drop JSONL analysis.
+- [x] Executive PDF export for leadership and stakeholder reviews.
+
+### Phase 4: Enterprise & Team Sync (Upcoming - v1.4.0)
+- [ ] Enterprise team dashboard with aggregated multi-seat API cost savings analytics.
+- [ ] Shared team rulesets for context exclusion (e.g., centralized `.contextcutignore`).
+- [ ] Language expansion: Go and Rust AST pruners.

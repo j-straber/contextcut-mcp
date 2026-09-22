@@ -43,8 +43,11 @@ To earn real US Dollars without spending money on upfront advertising, ContextCu
 │      mentioned in user prompts                              │
 │ 3. Team Context Filters:                                    │
 │    • Workspace rules (e.g., auto-prune tests/, mocks/)      │
-│ 4. Cumulative Dollar Savings Dashboard:                     │
-│    • Local SQLite / JSON tracker showing monthly $ saved    │
+│ 4. Cumulative Dollar Savings Dashboard & Web Viewer (Shipped in v1.3.0): │
+│    • Local append-only ledger (`~/.contextcut/history.jsonl`)            │
+│    • CLI dashboard (`npx contextcut-mcp dashboard`) with live sync       │
+│    • Drag-and-drop web viewer (`5tra83rstudios.com/viewer`)              │
+│    • Executive PDF export for CFO and team lead reviews                  │
 └─────────────────────────────────────────────────────────────┘
 ```
 
