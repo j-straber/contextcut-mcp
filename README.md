@@ -74,6 +74,20 @@ node build/index.js report --interval=weekly
 node build/index.js report --interval=monthly --json
 ```
 
+### 📈 Visual Interactive Dashboard (Web UI & CLI):
+Launch an interactive visual dashboard in your browser to visualize savings over time, track top pruned files, and export executive PDF reports:
+
+```bash
+# Launch offline visual dashboard in your default browser:
+node build/index.js dashboard
+# Or when installed via npm:
+npx contextcut-mcp dashboard
+```
+
+Or access the cloudless drag-and-drop web viewer directly on our site:
+👉 **[5tra83rstudios.com/viewer](https://5tra83rstudios.com/viewer/)** (100% private, client-side only; zero telemetry leaves your browser).
+
+
 ---
 
 ## 🚀 Quick Start
@@ -164,11 +178,6 @@ Guides your AI agent to inspect a repository's high-level architecture using pru
 ### Resource: `contextcut://pruned/{filepath}`
 Exposes on-demand pruned stubs as native MCP readable resources.
 
-### Prompt: `analyze_architecture`
-Guides your AI agent to inspect a repository's high-level architecture using pruned interface stubs without getting lost in implementation noise.
-
-### Resource: `contextcut://pruned/{filepath}`
-Exposes on-demand pruned stubs as native MCP readable resources.
 
 ---
 

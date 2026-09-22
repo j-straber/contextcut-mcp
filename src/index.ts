@@ -20,7 +20,8 @@ import {
   ListPromptsRequestSchema,
   GetPromptRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
-import { execFile } from "child_process";
+import http from "http";
+import { exec, execFile } from "child_process";
 import { promisify } from "util";
 import { fileURLToPath } from "url";
 import path from "path";
@@ -599,6 +600,48 @@ async function run() {
       `\nYour AI coding agents (Cursor, Claude Desktop, Antigravity) will now automatically route files through ContextCut first to slash token waste by 50–80%.\n`
     );
     process.exit(0);
+  }
+
+  // Check for CLI dashboard invocation (e.g. npx contextcut-mcp dashboard)
+  const isDashboardArg = process.argv.some(
+    (a) => a === "dashboard" || a === "ui" || a === "viewer" || a === "--dashboard"
+  );
+
+  if (isDashboardArg) {
+    const { readHistoryRecords } = await import("./telemetry.js");
+    const { getDashboardHtml } = await import("./dashboard_html.js");
+    const { records } = await readHistoryRecords("all_time");
+
+    const html = getDashboardHtml(JSON.stringify(records));
+    const port = 3800;
+
+    const localServer = http.createServer((_req, res) => {
+      res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+      res.end(html);
+    });
+
+    localServer.listen(port, () => {
+      const url = `http://localhost:${port}`;
+      console.log(`\n⚡ [ContextCut Executive Dashboard]`);
+      console.log(`✓ Serving visual analytics from ~/.contextcut/history.jsonl (${records.length} events)`);
+      console.log(`✓ Opening browser at: ${url}`);
+      console.log(`\nPress Ctrl+C to stop the dashboard server.\n`);
+
+      const openCmd =
+        process.platform === "darwin"
+          ? `open "${url}"`
+          : process.platform === "win32"
+          ? `start "${url}"`
+          : `xdg-open "${url}"`;
+
+      exec(openCmd, (err) => {
+        if (err) {
+          console.log(`(Please open ${url} in your browser)`);
+        }
+      });
+    });
+
+    return;
   }
 
   const transport = new StdioServerTransport();
