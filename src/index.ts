@@ -535,6 +535,72 @@ async function run() {
     process.exit(0);
   }
 
+  // Check for CLI init / setup invocation (e.g. npx contextcut-mcp init)
+  const isInitArg = process.argv.some(
+    (a) => a === "init" || a === "setup" || a === "--init" || a === "--setup"
+  );
+
+  if (isInitArg) {
+    const autopilotRule = `\n# ContextCut Agent Autopilot Rule
+# -----------------------------------------------------------------------------
+# When exploring, surveying, or analyzing code architecture, class definitions,
+# or public API interfaces, ALWAYS invoke the \`prune_code_context\` MCP tool first
+# to eliminate token bloat. Only inspect raw, unpruned function bodies if you are
+# explicitly modifying the internal implementation of that specific function.
+# -----------------------------------------------------------------------------\n`;
+
+    const cwd = process.cwd();
+    const cursorRulesPath = path.join(cwd, ".cursorrules");
+    const claudeMdPath = path.join(cwd, "CLAUDE.md");
+
+    const updatedFiles: string[] = [];
+
+    // Append to or create .cursorrules
+    try {
+      const existingCursor = fs.existsSync(cursorRulesPath)
+        ? fs.readFileSync(cursorRulesPath, "utf-8")
+        : "";
+      if (!existingCursor.includes("prune_code_context")) {
+        fs.writeFileSync(
+          cursorRulesPath,
+          (existingCursor.trim() ? existingCursor.trim() + "\n" : "") + autopilotRule,
+          "utf-8"
+        );
+        updatedFiles.push(".cursorrules");
+      }
+    } catch (e) {
+      console.error("Warning: Could not write .cursorrules:", e);
+    }
+
+    // Append to or create CLAUDE.md
+    try {
+      const existingClaude = fs.existsSync(claudeMdPath)
+        ? fs.readFileSync(claudeMdPath, "utf-8")
+        : "";
+      if (!existingClaude.includes("prune_code_context")) {
+        fs.writeFileSync(
+          claudeMdPath,
+          (existingClaude.trim() ? existingClaude.trim() + "\n" : "") + autopilotRule,
+          "utf-8"
+        );
+        updatedFiles.push("CLAUDE.md");
+      }
+    } catch (e) {
+      console.error("Warning: Could not write CLAUDE.md:", e);
+    }
+
+    console.log(`\n⚡ [ContextCut Autopilot Mode Initialized]`);
+    if (updatedFiles.length > 0) {
+      console.log(`✓ Added Autopilot rule to: ${updatedFiles.join(", ")}`);
+    } else {
+      console.log(`✓ Autopilot rule already present in .cursorrules and CLAUDE.md`);
+    }
+    console.log(
+      `\nYour AI coding agents (Cursor, Claude Desktop, Antigravity) will now automatically route files through ContextCut first to slash token waste by 50–80%.\n`
+    );
+    process.exit(0);
+  }
+
   const transport = new StdioServerTransport();
   await server.connect(transport);
   console.error("ContextCut Polyglot MCP Server v1.3.0 is running on stdio");

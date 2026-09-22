@@ -116,6 +116,27 @@ Configure in your project's `.agents/` or MCP settings:
 }
 ```
 
+### 3. Enable Agent Autopilot Mode (Recommended)
+Never forget to use ContextCut again. Run this 1-click command inside any project directory:
+
+```bash
+node /ABSOLUTE/PATH/TO/contextcut-mcp/build/index.js init
+# Or when installed via npm:
+npx contextcut-mcp init
+```
+
+This automatically writes the Autopilot rule to your `.cursorrules` and `CLAUDE.md`:
+```markdown
+# ContextCut Agent Autopilot Rule
+# -----------------------------------------------------------------------------
+# When exploring, surveying, or analyzing code architecture, class definitions,
+# or public API interfaces, ALWAYS invoke the `prune_code_context` MCP tool first
+# to eliminate token bloat. Only inspect raw, unpruned function bodies if you are
+# explicitly modifying the internal implementation of that specific function.
+# -----------------------------------------------------------------------------
+```
+Your agents in Cursor, Claude Desktop, and Antigravity will now automatically route code through ContextCut before analyzing architecture, slashing token consumption on autopilot!
+
 ---
 
 ## 🛠 Available Tools, Prompts & Resources
