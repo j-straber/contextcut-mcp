@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 # ==============================================================================
-# © 2026 5tra83r Studios. All rights reserved.
+# © 2026 5tra83r Studios LLC. All rights reserved.
 #
 # PROPRIETARY AND CONFIDENTIAL
 # This source code and any compiled binaries are the sole property of 
-# 5tra83r Studios. Unauthorized copying, modification, distribution, or use 
+# 5tra83r Studios LLC. Unauthorized copying, modification, distribution, or use 
 # of this file, via any medium, is strictly prohibited without express written 
-# permission from 5tra83r Studios.
+# permission from 5tra83r Studios LLC.
 # ==============================================================================
 """
 ContextCut - AST-Based Context Pruner for LLMs & AI Coding Agents.

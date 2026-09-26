@@ -1,6 +1,6 @@
 /**
  * ==============================================================================
- * © 2026 5tra83r Studios. All rights reserved.
+ * © 2026 5tra83r Studios LLC. All rights reserved.
  *
  * PROPRIETARY AND CONFIDENTIAL
  * ContextCut Persistent Telemetry & Historical Savings Analytics

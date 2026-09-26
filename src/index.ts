@@ -1,12 +1,12 @@
 /**
  * ==============================================================================
- * © 2026 5tra83r Studios. All rights reserved.
+ * © 2026 5tra83r Studios LLC. All rights reserved.
  *
  * PROPRIETARY AND CONFIDENTIAL
  * This source code and any compiled binaries are the sole property of 
- * 5tra83r Studios. Unauthorized copying, modification, distribution, or use 
+ * 5tra83r Studios LLC. Unauthorized copying, modification, distribution, or use 
  * of this file, via any medium, is strictly prohibited without express written 
- * permission from 5tra83r Studios.
+ * permission from 5tra83r Studios LLC.
  * ==============================================================================
  */
 
@@ -27,6 +27,7 @@ import { fileURLToPath } from "url";
 import path from "path";
 import fs from "fs";
 import { pruneTypeScriptCode, pruneTypeScriptFile } from "./ts_pruner.js";
+import { applyAiSafetyGuardrails } from "./safety_guardrail.js";
 import { getLicenseStatus, validateProAccess } from "./license.js";
 import {
   recordPruneEvent,
@@ -99,22 +100,32 @@ function isTypeScriptOrJavaScript(filePath?: string, languageHint?: string): boo
   return false;
 }
 
-function formatTsTelemetry(origChars: number, prunedChars: number, filesCount = 1): string {
+function formatTsTelemetry(
+  origChars: number,
+  prunedChars: number,
+  filesCount = 1,
+  secretsRedacted = 0,
+  redactedTypes: string[] = []
+): string {
   const savedChars = Math.max(0, origChars - prunedChars);
   const origTokens = Math.max(1, Math.floor(origChars / 4));
   const prunedTokens = Math.max(1, Math.floor(prunedChars / 4));
   const savedTokens = Math.max(0, origTokens - prunedTokens);
   const pctSaved = origChars > 0 ? ((savedChars / origChars) * 100).toFixed(1) : "0.0";
   const costSaved = ((savedTokens / 1_000_000) * 3.0).toFixed(4);
-  const fileLine = filesCount > 1 ? `Files Pruned:   ${filesCount}\n * ` : "";
+  const fileLine = filesCount > 1 ? `Files Pruned:     ${filesCount}\n * ` : "";
+  const safetyLine =
+    secretsRedacted > 0
+      ? `AI Safety Shield: REDACTED ${secretsRedacted} secret(s) (${redactedTypes.join(", ")})\n * `
+      : `AI Safety Shield: Verified Safe (0 credentials exposed)\n * `;
 
   return `/**
- * [ContextCut Telemetry - Pro Polyglot Engine]
+ * [ContextCut Telemetry - Pro Polyglot Engine | 5tra83r Studios LLC.]
  * ----------------------------------------
- * ${fileLine}Original Size:  ${origChars.toLocaleString()} chars (~${origTokens.toLocaleString()} tokens)
- * Pruned Size:    ${prunedChars.toLocaleString()} chars (~${prunedTokens.toLocaleString()} tokens)
- * Token Savings:  ${pctSaved}% reduction (~${savedTokens.toLocaleString()} tokens saved)
- * Est. Cost Saved: $${costSaved} per prompt (@ $3.00/1M tokens)
+ * ${fileLine}${safetyLine}Original Size:    ${origChars.toLocaleString()} chars (~${origTokens.toLocaleString()} tokens)
+ * Pruned Size:      ${prunedChars.toLocaleString()} chars (~${prunedTokens.toLocaleString()} tokens)
+ * Token Savings:    ${pctSaved}% reduction (~${savedTokens.toLocaleString()} tokens saved)
+ * Est. Cost Saved:  $${costSaved} per prompt (@ $3.00/1M tokens)
  * ----------------------------------------
  */\n\n`;
 }
@@ -302,7 +313,13 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       // Pro access validated: execute TypeScript AST pruner
-      let tsRes: { pruned: string; origChars: number; prunedChars: number } | null = null;
+      let tsRes: {
+        pruned: string;
+        origChars: number;
+        prunedChars: number;
+        secretsRedacted?: number;
+        redactedTypes?: string[];
+      } | null = null;
       let filesCount = 1;
 
       if (codeContent) {
@@ -348,25 +365,37 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             filesCount = matchedFiles.length;
             let totalOrig = 0;
             let totalPruned = 0;
+            let totalRedacted = 0;
+            const allTypes = new Set<string>();
             const outputParts: string[] = [];
             for (const file of matchedFiles) {
               const rel = path.relative(targetPath, file);
               const singleRes = await pruneTypeScriptFile(file);
               totalOrig += singleRes.origChars;
               totalPruned += singleRes.prunedChars;
+              totalRedacted += singleRes.secretsRedacted || 0;
+              (singleRes.redactedTypes || []).forEach((t) => allTypes.add(t));
               outputParts.push(`// ========================================\n// File: ${rel}\n// ========================================\n${singleRes.pruned}\n`);
             }
             tsRes = {
               pruned: outputParts.join("\n"),
               origChars: totalOrig,
               prunedChars: totalPruned,
+              secretsRedacted: totalRedacted,
+              redactedTypes: Array.from(allTypes),
             };
           }
         }
       }
 
       if (tsRes) {
-        const header = formatTsTelemetry(tsRes.origChars, tsRes.prunedChars, filesCount);
+        const header = formatTsTelemetry(
+          tsRes.origChars,
+          tsRes.prunedChars,
+          filesCount,
+          tsRes.secretsRedacted || 0,
+          tsRes.redactedTypes || []
+        );
         const origTokens = Math.max(1, Math.floor(tsRes.origChars / 4));
         const prunedTokens = Math.max(1, Math.floor(tsRes.prunedChars / 4));
         const savedTokens = Math.max(0, origTokens - prunedTokens);
@@ -419,7 +448,11 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     try {
       const parsed = JSON.parse(result);
       if (parsed && typeof parsed === "object" && typeof parsed.output === "string") {
-        outputText = parsed.output;
+        const safety = applyAiSafetyGuardrails(parsed.output);
+        outputText = safety.sanitized;
+        if (safety.secretsRedacted > 0) {
+          outputText = `/**\n * [ContextCut AI Safety Guardrail - 5tra83r Studios LLC.]\n * Shield Active: Redacted ${safety.secretsRedacted} sensitive credential(s) (${safety.redactedTypes.join(", ")})\n */\n\n` + outputText;
+        }
         await recordPruneEvent({
           lang: "python",
           target: targetPath || "<raw_code>",
@@ -434,6 +467,11 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
     } catch {
       // Fallback if result was plain text
+      const safety = applyAiSafetyGuardrails(result);
+      outputText = safety.sanitized;
+      if (safety.secretsRedacted > 0) {
+        outputText = `/**\n * [ContextCut AI Safety Guardrail - 5tra83r Studios LLC.]\n * Shield Active: Redacted ${safety.secretsRedacted} sensitive credential(s) (${safety.redactedTypes.join(", ")})\n */\n\n` + outputText;
+      }
     }
 
     return {

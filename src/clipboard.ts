@@ -1,6 +1,6 @@
 /**
  * ==============================================================================
- * © 2026 5tra83r Studios. All rights reserved.
+ * © 2026 5tra83r Studios LLC. All rights reserved.
  *
  * PROPRIETARY AND CONFIDENTIAL
  * ContextCut Quick Clipboard Trimmer (For ChatGPT, Gemini, & Claude Web)
@@ -10,6 +10,7 @@
 import { exec, execFile } from "child_process";
 import { promisify } from "util";
 import { pruneTypeScriptCode } from "./ts_pruner.js";
+import { applyAiSafetyGuardrails } from "./safety_guardrail.js";
 import { recordPruneEvent } from "./telemetry.js";
 import path from "path";
 import fs from "fs";
@@ -85,10 +86,7 @@ export async function writeClipboard(text: string): Promise<void> {
   });
 }
 
-/**
- * Automatically detects language and trims text down to essential stubs.
- */
-export async function trimClipboardContent(rawContent: string): Promise<{
+export interface ClipboardResult {
   trimmed: string;
   lang: string;
   origTokens: number;
@@ -96,7 +94,15 @@ export async function trimClipboardContent(rawContent: string): Promise<{
   savedTokens: number;
   reductionPct: number;
   savedUsd: number;
-}> {
+  secretsRedacted: number;
+  redactedTypes: string[];
+}
+
+/**
+ * Automatically detects language and trims text down to essential stubs.
+ * Applies 5tra83r Studios LLC. AI Safety Guardrail to strip secrets and API keys.
+ */
+export async function trimClipboardContent(rawContent: string): Promise<ClipboardResult> {
   const trimmedInput = rawContent.trim();
   if (!trimmedInput) {
     throw new Error("Clipboard is empty! Copy some code or text first (Cmd+C), then run this tool.");
@@ -112,6 +118,8 @@ export async function trimClipboardContent(rawContent: string): Promise<{
 
   let prunedOutput = rawContent;
   let detectedLang = "generic";
+  let secretsRedacted = 0;
+  let redactedTypes: string[] = [];
 
   if (isPython) {
     detectedLang = "python";
@@ -135,14 +143,24 @@ export async function trimClipboardContent(rawContent: string): Promise<{
         prunedOutput = rawContent;
       }
     }
+    // Apply AI safety guardrail to Python clipboard output
+    const safety = applyAiSafetyGuardrails(prunedOutput);
+    prunedOutput = safety.sanitized;
+    secretsRedacted = safety.secretsRedacted;
+    redactedTypes = safety.redactedTypes;
   } else {
     // Default to TypeScript/JavaScript AST pruner
     detectedLang = "typescript";
     try {
       const res = pruneTypeScriptCode(rawContent);
       prunedOutput = res.pruned;
+      secretsRedacted = res.secretsRedacted || 0;
+      redactedTypes = res.redactedTypes || [];
     } catch {
-      prunedOutput = rawContent;
+      const safety = applyAiSafetyGuardrails(rawContent);
+      prunedOutput = safety.sanitized;
+      secretsRedacted = safety.secretsRedacted;
+      redactedTypes = safety.redactedTypes;
     }
   }
 
@@ -173,6 +191,8 @@ export async function trimClipboardContent(rawContent: string): Promise<{
     savedTokens,
     reductionPct,
     savedUsd,
+    secretsRedacted,
+    redactedTypes,
   };
 }
 
@@ -180,7 +200,7 @@ export async function trimClipboardContent(rawContent: string): Promise<{
  * Runs the CLI Clipboard Trimmer.
  */
 export async function runClipboardCli(): Promise<void> {
-  console.log(`\n✂️  [ContextCut Clipboard Trimmer]`);
+  console.log(`\n✂️  [ContextCut Clipboard Trimmer | 5tra83r Studios LLC.]`);
   console.log(`Reading text from system clipboard...`);
 
   const raw = await readClipboard();
@@ -200,7 +220,12 @@ export async function runClipboardCli(): Promise<void> {
   console.log(`• Trimmed Context:    ~${result.prunedTokens.toLocaleString()} tokens`);
   console.log(`• Reduction:          ${result.reductionPct.toFixed(1)}% savings (~${result.savedTokens.toLocaleString()} tokens saved)`);
   console.log(`• Est. Dollar Saved:  $${result.savedUsd.toFixed(4)} USD`);
+  if (result.secretsRedacted > 0) {
+    console.log(`• AI Safety Shield:   🛡️ REDACTED ${result.secretsRedacted} secret(s) (${result.redactedTypes.join(", ")})`);
+  } else {
+    console.log(`• AI Safety Shield:   🛡️ Verified Safe (0 credentials exposed)`);
+  }
   console.log(`--------------------------------------------------`);
-  console.log(`✓ Trimmed content is now in your clipboard (Cmd+V).`);
+  console.log(`✓ Trimmed & sanitized content is now in your clipboard (Cmd+V).`);
   console.log(`👉 Paste directly into ChatGPT, Gemini, or Claude without burning your 5-hour limit!\n`);
 }

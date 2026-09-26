@@ -1,6 +1,6 @@
 /**
  * ==============================================================================
- * © 2026 5tra83r Studios. All rights reserved.
+ * © 2026 5tra83r Studios LLC. All rights reserved.
  *
  * PROPRIETARY AND CONFIDENTIAL
  * ContextCut TypeScript / JavaScript AST Pruning Engine (Pro Engine)
@@ -9,11 +9,14 @@
 
 import { parse } from "@babel/parser";
 import fs from "fs";
+import { applyAiSafetyGuardrails } from "./safety_guardrail.js";
 
 export interface PruneResult {
   pruned: string;
   origChars: number;
   prunedChars: number;
+  secretsRedacted: number;
+  redactedTypes: string[];
 }
 
 interface NodeRange {
@@ -32,7 +35,7 @@ export function pruneTypeScriptCode(
 ): PruneResult {
   const origChars = sourceCode.length;
   if (!sourceCode.trim()) {
-    return { pruned: sourceCode, origChars, prunedChars: origChars };
+    return { pruned: sourceCode, origChars, prunedChars: origChars, secretsRedacted: 0, redactedTypes: [] };
   }
 
   let ast: any;
@@ -50,10 +53,13 @@ export function pruneTypeScriptCode(
     });
   } catch (error) {
     const warning = `// [ContextCut Warning: Parse error: ${error instanceof Error ? error.message : String(error)}]\n`;
+    const safety = applyAiSafetyGuardrails(sourceCode);
     return {
-      pruned: warning + sourceCode,
+      pruned: warning + safety.sanitized,
       origChars,
-      prunedChars: origChars + warning.length,
+      prunedChars: (warning + safety.sanitized).length,
+      secretsRedacted: safety.secretsRedacted,
+      redactedTypes: safety.redactedTypes,
     };
   }
 
@@ -114,10 +120,15 @@ export function pruneTypeScriptCode(
     pruned = pruned.slice(0, range.start) + "{ /* stub */ }" + pruned.slice(range.end);
   }
 
+  // Apply 5tra83r Studios LLC. AI Safety Guardrail (Secret & Credential Redaction)
+  const safety = applyAiSafetyGuardrails(pruned);
+
   return {
-    pruned,
+    pruned: safety.sanitized,
     origChars,
-    prunedChars: pruned.length,
+    prunedChars: safety.sanitized.length,
+    secretsRedacted: safety.secretsRedacted,
+    redactedTypes: safety.redactedTypes,
   };
 }
 
